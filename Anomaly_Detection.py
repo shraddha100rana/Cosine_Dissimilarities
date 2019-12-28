@@ -66,35 +66,31 @@ plt.title('w = 12 weeks')
 plt.show()
 
 #location of anomalies for all combinations of w and tau
-locs = [[] for i in range(8)]
-k = 0
+locs = [[] for i in range(4)]
 
 #past weeks/lags
 w = [4,6,8,12]
 #dissimilarity threshold
-tau = [0.07, 0.12]
+tau = 0.07
 
 for i in range(len(w)):
-    for j in range (len(tau)):
-        #average behavior
-        ab = np.zeros((248,136,16))
+    #average behavior
+    ab = np.zeros((248,136,16))
+    for t in range (w[i],248):
+        ab[t,:,:] = np.mean(fv[t-w[i]:t,:,:], axis = 0)
+
+    #dissimilarity
+    d = np.zeros((248,136))
+    #dissimilarity between fv and ab at every time
+    for n in range(0,136):
         for t in range (w[i],248):
-            ab[t,:,:] = np.mean(fv[t-w[i]:t,:,:], axis = 0)
-
-        #dissimilarity
-        d = np.zeros((248,136))
-        #dissimilarity between fv and ab at every time
-        for n in range(0,136):
-            for t in range (w[i],248):
-                d[t,n] = spatial.distance.cosine(fv[t,n,:].reshape(16, 1), ab[t,n,:].reshape(16, 1)) 
-                d = np.nan_to_num(d)
+            d[t,n] = spatial.distance.cosine(fv[t,n,:].reshape(16, 1), ab[t,n,:].reshape(16, 1)) 
+            d = np.nan_to_num(d)
                 
-        locs[k] = np.argwhere(d >= tau[j])
-        print(len(locs[k]))
-        k = k+1
-
+    locs[i] = np.argwhere(d >= tau)
+    np.savetxt('Location'+str(w[i])+'.csv', locs[i], delimiter=',', fmt='%d')
+    print(len(locs[i]))
+    
 #length of overlap in detected anomaly positions
-print(len(np.array([x for x in set(tuple(x) for x in locs[0]) & set(tuple(x) for x in locs[2]) &\
-                         set(tuple(x) for x in locs[4]) & set(tuple(x) for x in locs[6])])))
-print(len(np.array([x for x in set(tuple(x) for x in locs[1]) & set(tuple(x) for x in locs[3]) &\
-                         set(tuple(x) for x in locs[5]) & set(tuple(x) for x in locs[7])])))
+print(len(np.array([x for x in set(tuple(x) for x in locs[0]) & set(tuple(x) for x in locs[1]) &\
+                         set(tuple(x) for x in locs[2]) & set(tuple(x) for x in locs[3])])))
