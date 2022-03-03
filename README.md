@@ -6,4 +6,4 @@ In Spatial_Relationship_Discovery.py we use spatio-temporal neural networks to l
 
 In Time_Series_Forecasting.py we use spatio-temporal neural networks to learn temporal relationships of dynamic graphs.
 
-In Morans_Index.py we
+In Morans_Index.py we calculate the Moran's I of dynamic graphs that measures their spatial autocorrelation.
