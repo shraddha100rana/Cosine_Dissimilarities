@@ -6,13 +6,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 
-# X is input data
-# Size 247 (weeks) x 136 (nodes) x 35 (features) 
-X = np.load('X_Input_Daily.npy')
+# X is input features matrix
+X = np.load('X_Input_Data.npy')
+periods = X.shape[0]
+nodes = X.shape[1]
+features_X = X.shape[2]
 
-# Y is output data
-# Size 247 (weeks) x 136 (nodes) x 4 (features) 
+# y is output features matrix
 y = np.load('Y_Output_Daily.npy')
+features_y = y.shape[2]
 
 # Set device as GPU if available
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -29,7 +31,7 @@ train_loader = DataLoader(dataset = train_data, batch_size = 1)
 class Encoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(136*35, 128)
+        self.fc1 = nn.Linear(nodes*features_X, 128)
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 32)
         self.fc4 = nn.Linear(32, 16)
@@ -67,7 +69,7 @@ class Decoder(nn.Module):
         self.fc2 = nn.Linear(16, 32)
         self.fc3 = nn.Linear(32, 64)
         self.fc4 = nn.Linear(64, 128)
-        self.fc5 = nn.Linear(128, 136*4)
+        self.fc5 = nn.Linear(128, nodes*features_y)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -107,7 +109,7 @@ for epoch in range(n_epochs):
     for x_batch, y_batch in train_loader:
         
         x_batch = x_batch.to(device)
-        encoder_output = encoder(x_batch.view(-1,136*35))
+        encoder_output = encoder(x_batch.view(-1,nodes*features_X))
     
         # List of true Z_{t} 
         encoder_outputs.append(encoder_output)
@@ -128,10 +130,7 @@ for epoch in range(n_epochs):
     # Initializing hidden state of Dynamic process
     dynamic_hidden = dynamic.initHidden()
     
-    # time step
-    t = 0
     for Z_t_batch, Z_t1_batch in Z_loader:
-        t = t+1
         
         Z_t_batch = Z_t_batch.to(device)
         Z_t1_batch = Z_t1_batch.to(device)
@@ -158,7 +157,7 @@ for epoch in range(n_epochs):
         t = t+1
     
         # Adding MSE at each time step
-        decoder_loss += criterion(decoder_output.view(-1,136,4), y_batch)
+        decoder_loss += criterion(decoder_output.view(-1,nodes,features_y), y_batch)
     
     # Taking average of MSE for all time steps
     decoder_loss /= t
