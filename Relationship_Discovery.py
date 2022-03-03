@@ -6,16 +6,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 
-# X is input data
-# Size time periods x nodes x features
+# X is input features matrix
 X = np.load('X_Input_Data.npy')
-X_t = X.shape[0]
-X_n = X.shape[1]
-X_f = X.shape[2]
+periods = X.shape[0]
+nodes = X.shape[1]
+features_X = X.shape[2]
 
-# Y is output data
-# Size time periods x nodes x features
+# y is output features matrix
 y = np.load('Y_Output_Daily.npy')
+features_y = y.shape[2]
 
 # Set device as GPU if available
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -32,9 +31,9 @@ train_loader = DataLoader(dataset = train_data, batch_size = 1)
 class Encoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(X_n*X_f, X_n*16)
-        self.fc2 = nn.Linear(X_n*16, X_n*8)
-        self.fc3 = nn.Linear(X_n*8, X_n*4)
+        self.fc1 = nn.Linear(nodes*features_X, nodes*16)
+        self.fc2 = nn.Linear(nodes*16, nodes*8)
+        self.fc3 = nn.Linear(nodes*8, nodes*4)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -42,38 +41,34 @@ class Encoder(nn.Module):
         x = self.fc3(x)
         return F.log_softmax(x, dim = 1)
     
-# The Dynamic part captures the temporal relationship the latent representation
+# The Dynamic part captures the temporal relationship of the latent representation
 # We also specify a spatial relationship between the nodes which is learnt
 # Z_{t+1} = g(Z_{t}*Theta0 + W*Z_{t}*Theta1)
 class Dynamic(nn.Module):
     def __init__(self, hidden_size):
         super(Dynamic, self).__init__()
         self.hidden_size = hidden_size
-        self.W1 = nn.Parameter(torch.randn(X_n, X_n, requires_grad = True, dtype = torch.float))
-        self.W2 = nn.Parameter(torch.randn(X_n, X_n, requires_grad = True, dtype = torch.float))
+        self.W = nn.Parameter(torch.randn(nodes, nodes, requires_grad = True, dtype = torch.float))
         self.theta0 = nn.Parameter(torch.randn(hidden_size, hidden_size, requires_grad = True, dtype = torch.float))
         self.theta1 = nn.Parameter(torch.randn(hidden_size, hidden_size, requires_grad = True, dtype = torch.float))
-        self.theta2 = nn.Parameter(torch.randn(hidden_size, hidden_size, requires_grad = True, dtype = torch.float))
         
-        self.gru = nn.GRU(X_n*hidden_size, X_n*hidden_size)
+        self.gru = nn.GRU(nodes*hidden_size, nodes*hidden_size)
 
-    def forward(self, inp, hidden, k):
-        actual_inp = torch.matmul(inp.view(X_n, self.hidden_size), self.theta0) + \
-                     k*torch.matmul(torch.matmul(self.W1, inp.view(X_n, self.hidden_size)), self.theta1) + \
-                     (1-k)*torch.matmul(torch.matmul(self.W2, inp.view(X_n, self.hidden_size)), self.theta2)
-        actual_inp = actual_inp.view(1, 1, X_n*self.hidden_size)
+    def forward(self, inp, hidden):
+        actual_inp = torch.matmul(inp.view(nodes, self.hidden_size), self.theta0) + torch.matmul(torch.matmul(self.W, inp.view(nodes, self.hidden_size)), self.theta1) 
+        actual_inp = actual_inp.view(1, 1, nodes*self.hidden_size)
         output, hidden = self.gru(actual_inp, hidden)
         return output, hidden
 
     def initHidden(self):
-        return torch.zeros(1, 1, X_n*self.hidden_size, device = device)
+        return torch.zeros(1, 1, nodes*self.hidden_size, device = device)
 
 # The Decoder predicts the output using the latent representation
 # Y_{t} = d(Z_{t})
 class Decoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(X_n*4, X_n*4)
+        self.fc1 = nn.Linear(nodes*features_y, nodes*features_y)
         
     def forward(self, x):
         x = self.fc1(x)
@@ -109,7 +104,7 @@ for epoch in range(n_epochs):
     for x_batch, y_batch in train_loader:
         
         x_batch = x_batch.to(device)
-        encoder_output = encoder(x_batch.view(-1,X_n*X_f))
+        encoder_output = encoder(x_batch.view(-1,nodes*features_X))
     
         # List of true Z_{t} 
         encoder_outputs.append(encoder_output)
@@ -162,10 +157,10 @@ for epoch in range(n_epochs):
         decoder_output = decoder(encoder_outputs[t])
         t = t+1
     
-        # Adding MSE at each time step
-        decoder_loss += criterion(decoder_output.view(-1,X_n,4), y_batch)
+        # Adding error at each time step
+        decoder_loss += criterion(decoder_output.view(-1,nodes,4), y_batch)
     
-    # Taking average of MSE for all time steps
+    # Taking average of error for all time steps
     decoder_loss /= t
     
     # Both losses contribute to the updates
@@ -179,7 +174,5 @@ for epoch in range(n_epochs):
     if (epoch%10 == 0):
         print(loss)
 
-W1_final = dynamic.W1.detach().numpy()
-W2_final = dynamic.W2.detach().numpy()
-np.save('W_Relation_Disaster', W1_final)
-np.save('W_Relation_Regular', W2_final)
+W_final = dynamic.W.detach().numpy()
+np.save('Spatial_Relation_Matrix', W_final)
