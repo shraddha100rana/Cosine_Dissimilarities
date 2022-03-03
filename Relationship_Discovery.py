@@ -33,7 +33,7 @@ class Encoder(nn.Module):
         super().__init__()
         self.fc1 = nn.Linear(nodes*features_X, nodes*16)
         self.fc2 = nn.Linear(nodes*16, nodes*8)
-        self.fc3 = nn.Linear(nodes*8, nodes*4)
+        self.fc3 = nn.Linear(nodes*8, nodes*features_y)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
@@ -80,7 +80,7 @@ n_epochs = 100
 rate = 0.01
 
 encoder = Encoder().to(device)
-dynamic = Dynamic(hidden_size = 4).to(device)
+dynamic = Dynamic(hidden_size = features_y).to(device)
 decoder = Decoder().to(device)
 
 encoder_optimizer = optim.SGD(encoder.parameters(), lr = rate)
@@ -125,13 +125,7 @@ for epoch in range(n_epochs):
     # Initializing hidden state of Dynamic process
     dynamic_hidden = dynamic.initHidden()
     
-    # time step
-    t = 0
     for Z_t_batch, Z_t1_batch in Z_loader:
-        x = X[t,:,34]
-        #if disaster was declared, disaster indicator is 1
-        disaster_indicator = int(1 in x)
-        t = t+1
         
         Z_t_batch = Z_t_batch.to(device)
         Z_t1_batch = Z_t1_batch.to(device)
@@ -158,7 +152,7 @@ for epoch in range(n_epochs):
         t = t+1
     
         # Adding error at each time step
-        decoder_loss += criterion(decoder_output.view(-1,nodes,4), y_batch)
+        decoder_loss += criterion(decoder_output.view(-1,nodes,features_y), y_batch)
     
     # Taking average of error for all time steps
     decoder_loss /= t
