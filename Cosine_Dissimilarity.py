@@ -33,32 +33,28 @@ a.set(title = "Cosine Dissimilarity", xlabel = "Node", ylabel = "Time Period")
 #k-means clustering of dissimilarity values
 km = KMeans()
 a = km.fit(d[w:,:].reshape(-1,1))
-
 #number of clusters
-clust = a.n_clusters
-print(clust)
-#center of clusters
-print(a.cluster_centers_)
-
+clusters = a.n_clusters
+centers = a.cluster_centers_
 b = a.labels_.reshape(periods-w,nodes)
 
 k_clusters_bins = np.zeros((clust,3))
-for i in range(clust):
+for i in range(clusters):
     k_clusters_bins[i,0] = min(d[w:,:].reshape(-1,1)[a.labels_ == i])
     k_clusters_bins[i,1] = max(d[w:,:].reshape(-1,1)[a.labels_ == i])
     k_clusters_bins[i,2] = len(d[w:,:].reshape(-1,1)[a.labels_ == i])
 k_clusters_bins = k_clusters_bins[k_clusters_bins[:, 0].argsort()]
 
-ranges = [''] * clust
-for i in range(clust):
+ranges = [''] * clusters
+for i in range(clusters):
     ranges[i] = str(round(k_clusters_bins[i,0], 2))+"-"+str(round(k_clusters_bins[i,1], 2))
-x = np.arange(clust)
+x = np.arange(clusters)
 freq = k_clusters_bins[:,2]
 
+#plot cluster histogram of dissimilarity values
 plt.figure(figsize = (15, 5))
 plt.bar(x, freq, align = 'center')
 plt.xticks(x, ranges)
 plt.xlabel('Cosine Dissimilarity')
 plt.ylabel('Frequency')
-plt.title('w = 12 weeks')
 plt.show()
